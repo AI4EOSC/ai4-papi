@@ -1,8 +1,7 @@
-"""
-Misc routes.
+"""Misc routes.
 
-Methods returning the conf are authenticated in order to be
-able to fill the `Virtual Organization` field.
+Methods returning the conf are authenticated in order to be able to fill the `Virtual
+Organization` field.
 """
 
 from copy import deepcopy
@@ -21,26 +20,25 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
-security = HTTPBearer()
+security = Depends(HTTPBearer())
+
+base_mod_url = "https://registry.hub.docker.com/v2/repositories/deephdc/"
 
 
 @router.get("/conf/{module_name}")
-def get_default_deployment_conf(
-    module_name: str,
-    authorization=Depends(security),
-):
+def get_default_deployment_conf(module_name: str, authorization=security):
     """
-    Returns the default configuration (dict) for creating a deployment
-    for a specific module. It is prefilled with the appropriate
-    docker image and the available docker tags.
+    Return the default configuration to creating a deployment for a module.
 
-    We are not checking if module exists in the marketplace because
-    we are treating each route as independent. In the future, this can
-    be done as an API call to the other route.
+    It is prefilled with the appropriate docker image and the available docker tags.
+
+    We are not checking if module exists in the marketplace because we are treating each
+    route as independent. In the future, this can be done as an API call to the other
+    route.
     """
     # Retrieve authenticated user info
     auth_info = get_user_info(token=authorization.credentials)
-    vos = auth_info['vo']
+    vos = auth_info["vo"]
 
     # Generate the conf
     conf = deepcopy(USER_CONF)
@@ -53,16 +51,16 @@ def get_default_deployment_conf(
     conf["general"]["docker_image"]["value"] = f"deephdc/{module_name.lower()}"
 
     # Add available Docker tags
-    url = f"https://registry.hub.docker.com/v2/repositories/deephdc/{module_name.lower()}/tags"
+    url = f"{base_mod_url}/{module_name.lower()}/tags"
     try:
-        r = requests.get(url)
+        r = requests.get(url, timeout=15)
         r.raise_for_status()
         r = r.json()
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=400,
             detail="Could not retrieve Docker tags from {module_name}.",
-            )
+        )
 
     tags = [i["name"] for i in r["results"]]
     conf["general"]["docker_tag"]["options"] = tags
