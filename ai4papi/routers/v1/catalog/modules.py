@@ -74,7 +74,8 @@ def get_config(
 
 
 Modules = Catalog(
-    repo='ai4os-hub/modules-catalog',
+    repo=papiconf.CATALOG_MODULES['repo'],
+    branch=papiconf.CATALOG_MODULES['branch']
 )
 Modules.get_config = types.MethodType(get_config, Modules)
 

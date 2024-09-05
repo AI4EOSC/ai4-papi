@@ -50,7 +50,8 @@ def get_config(
 
 
 Tools = Catalog(
-    repo='ai4os/tools-catalog',
+    repo=papiconf.CATALOG_TOOLS['repo'],
+    branch=papiconf.CATALOG_TOOLS['branch']
 )
 Tools.get_config = types.MethodType(get_config, Tools)
 

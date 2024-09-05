@@ -145,6 +145,14 @@ def get_deployment(
         if job['active_endpoints']:
             job['active_endpoints'] = [k for k in job['active_endpoints'] if k not in ignore]
 
+    if tool_id == 'ai4os-nvflare':
+        # Remove useless endpoints (they all point to same url)
+        # TODO
+        ignore = []
+        job['endpoints'] = {k: v for k, v in job['endpoints'].items() if k not in ignore}
+        if job['active_endpoints']:
+            job['active_endpoints'] = [k for k in job['active_endpoints'] if k not in ignore]
+
     return job
 
 
@@ -344,6 +352,63 @@ def create_deployment(
 
         # Convert template to Nomad conf
         nomad_conf = nomad.load_job_conf(nomad_conf)
+
+    # Deploy an NVFlare Federated server and Dashboard
+    # TODO
+    elif tool_name == 'ai4os-nvflare':
+
+        # Create a default secret for the Federated Server
+        _ = ai4secrets.create_secret(
+            vo=vo,
+            secret_path=f"deployments/{job_uuid}/federated/default",
+            secret_data={'token': secrets.token_hex()},
+            authorization=SimpleNamespace(
+                credentials=authorization.credentials,
+            ),
+        )
+
+        # Create a Vault token so that the deployment can access the Federated secret
+        vault_token = ai4secrets.create_vault_token(
+            jwt=authorization.credentials,
+            issuer=auth_info['issuer'],
+            ttl='365d',  # 1 year expiration date
+        )
+
+        # Replace the Nomad job template
+        nomad_conf = nomad_conf.safe_substitute(
+            {
+                'JOB_UUID': job_uuid,
+                'NAMESPACE': papiconf.MAIN_CONF['nomad']['namespaces'][vo],
+                'PRIORITY': priority,
+                'OWNER': auth_info['id'],
+                'OWNER_NAME': auth_info['name'],
+                'OWNER_EMAIL': auth_info['email'],
+                'TITLE': user_conf['general']['title'][:45],  # keep only 45 first characters
+                'DESCRIPTION': user_conf['general']['desc'][:1000],  # limit to 1K characters
+                'BASE_DOMAIN': base_domain,
+                'HOSTNAME': hostname,
+                'DOCKER_IMAGE': user_conf['general']['docker_image'],
+                'DOCKER_TAG': user_conf['general']['docker_tag'],
+                'CPU_NUM': user_conf['hardware']['cpu_num'],
+                'RAM': user_conf['hardware']['ram'],
+                'DISK': user_conf['hardware']['disk'],
+                'SHARED_MEMORY': user_conf['hardware']['ram'] * 10**6 * 0.5,
+                # Limit at 50% of RAM memory, in bytes
+                'NVFLARE_SERVER_JUPYTER_PASSWORD': user_conf['general']['server_jupyter_password']
+            }
+        )
+
+        # Convert template to Nomad conf
+        nomad_conf = nomad.load_job_conf(nomad_conf)
+
+        tasks = nomad_conf['TaskGroups'][0]['Tasks']
+        usertask = [t for t in tasks if t['Name']=='main'][0]
+
+        # Launch `deep-start` compatible service if needed
+        service = user_conf['general']['service']
+        if service in ['deepaas', 'jupyter', 'vscode']:
+            usertask['Config']['command'] = 'deep-start'
+            usertask['Config']['args'] = [f'--{service}']
 
     # Submit job
     r = nomad.create_deployment(nomad_conf)

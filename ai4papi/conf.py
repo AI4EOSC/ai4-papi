@@ -54,6 +54,16 @@ def load_yaml_conf(fpath):
     return conf_full, conf_values
 
 
+# Catalogs
+CATALOG_MODULES = {
+  'repo': 'ai4os-hub/modules-catalog',
+  'branch': 'master'
+}
+CATALOG_TOOLS = {
+  'repo': 'ai4os/tools-catalog',
+  'branch': 'dev'
+}
+
 # Standard modules
 nmd = load_nomad_job(paths['conf'] / 'modules' / 'nomad.hcl')
 yml = load_yaml_conf(paths['conf'] / 'modules' / 'user.yaml')
@@ -84,6 +94,7 @@ for tool_path in tool_list:
 tools_nomad2id = {
     'fl': 'ai4os-federated-server',
     'cvat': 'ai4os-cvat',
+    'nvflare': 'ai4os-nvflare',
 }
 for tool in TOOLS.keys():
     if tool not in tools_nomad2id.values():

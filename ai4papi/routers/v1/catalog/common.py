@@ -32,15 +32,15 @@ import requests
 
 import ai4papi.conf as papiconf
 
-
 class Catalog:
 
-    def __init__(self, repo: str) -> None:
+    def __init__(self, repo: str, branch: str) -> None:
         """
         Parameters:
         * repo: Github repo where the catalog is hosted (via git submodules)
         """
         self.repo = repo
+        self.branch = branch
 
 
     @cached(cache=TTLCache(maxsize=1024, ttl=6*60*60))
@@ -60,7 +60,7 @@ class Catalog:
         This is implemented in a separate function as many functions from this router
         are using this function, so we need to avoid infinite recursions.
         """
-        gitmodules_url = f"https://raw.githubusercontent.com/{self.repo}/master/.gitmodules"
+        gitmodules_url = f"https://raw.githubusercontent.com/{self.repo}/{self.branch}/.gitmodules"
         r = requests.get(gitmodules_url)
 
         cfg = configparser.ConfigParser()
