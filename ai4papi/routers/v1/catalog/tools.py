@@ -39,6 +39,13 @@ def get_config(
         conf["general"]["docker_tag"]["options"] = tags
         conf["general"]["docker_tag"]["value"] = tags[0]
 
+    if item_name in ['ai4os-nvflare']:
+        conf["general"]["docker_image"]["value"] = f"{repo}/{image}"
+
+        tags = retrieve_docker_tags(image=image, repo=repo)
+        conf["general"]["docker_tag"]["options"] = tags
+        conf["general"]["docker_tag"]["value"] = tags[0]
+
     # Modify the resources limits for a given user or VO
     if conf.get("hardware", None):
         conf["hardware"] = quotas.limit_resources(

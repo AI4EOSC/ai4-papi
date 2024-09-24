@@ -210,7 +210,7 @@ def create_deployment(
 
     # Check if the provided configuration is within the job quotas
     # Skip this check with CVAT because it does not have a "hardware" section in the conf
-    if tool_name not in ['ai4os-cvat']:
+    if tool_name not in ['ai4os-cvat', 'ai4os-nvflare']:
         quotas.check_jobwise(
             conf=user_conf,
             vo=vo,
@@ -387,8 +387,6 @@ def create_deployment(
                 'DESCRIPTION': user_conf['general']['desc'][:1000],  # limit to 1K characters
                 'BASE_DOMAIN': base_domain,
                 'HOSTNAME': hostname,
-                'DOCKER_IMAGE': user_conf['general']['docker_image'],
-                'DOCKER_TAG': user_conf['general']['docker_tag'],
                 'CPU_NUM': user_conf['hardware']['cpu_num'],
                 'RAM': user_conf['hardware']['ram'],
                 'DISK': user_conf['hardware']['disk'],
@@ -400,15 +398,6 @@ def create_deployment(
 
         # Convert template to Nomad conf
         nomad_conf = nomad.load_job_conf(nomad_conf)
-
-        tasks = nomad_conf['TaskGroups'][0]['Tasks']
-        usertask = [t for t in tasks if t['Name']=='main'][0]
-
-        # Launch `deep-start` compatible service if needed
-        service = user_conf['general']['service']
-        if service in ['deepaas', 'jupyter', 'vscode']:
-            usertask['Config']['command'] = 'deep-start'
-            usertask['Config']['args'] = [f'--{service}']
 
     # Submit job
     r = nomad.create_deployment(nomad_conf)

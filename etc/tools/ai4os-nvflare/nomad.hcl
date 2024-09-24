@@ -269,6 +269,11 @@ job "tool-nvflare-${JOB_UUID}" {
         image = "${NOMAD_META_image_server}"
         force_pull = "${NOMAD_META_force_pull_images}"
         ports = ["server-fl", "server-admin", "server-jupyter"]
+        shm_size = ${SHARED_MEMORY}
+        memory_hard_limit = ${RAM}
+        storage_opt = {
+          size = "${DISK}M"
+        }
         volumes = [
           "/nomad-storage/${JOB_UUID}.${meta.domain}-${BASE_DOMAIN}/server/tf:/tf:shared",
         ]
@@ -283,6 +288,12 @@ job "tool-nvflare-${JOB_UUID}" {
           "--no-browser",
           "--allow-root"
         ]
+      }
+
+      resources {
+        cores  = ${CPU_NUM}
+        memory = ${RAM}
+        memory_max = ${RAM}
       }
     }
      

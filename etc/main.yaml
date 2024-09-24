@@ -45,7 +45,7 @@ lb:  # load balancer, Traefik
 
   domain:  # each VO accesses deployments through their domain
 
-    vo.ai4eosc.eu: deployments.cloud.ai4eosc.eu
+    vo.ai4eosc.eu: localhost
     vo.imagine-ai.eu: deployments.cloud.imagine-ai.eu
     vo.ai4life.eu: deployments.cloud.ai4eosc.eu
     training.egi.eu: deployments.cloud.ai4eosc.eu

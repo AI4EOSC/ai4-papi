@@ -27,6 +27,11 @@ general:
     value: ''
     description: Host where your application will be deployed. Selecting `myapp` will make your deployment accessible at `http://myapp.deployments.etc`). If not provided, hostname will automatically default to your `job-uuid`.
 
+#  docker_image:
+#    name: Docker image
+#    value: 'registry.services.ai4os.eu/ai4os/ai4-nvflare-server'
+#    description: Docker image to be used.
+
   dashboard_username:
     name: NVFlare Dashboard username
     value: ''
@@ -42,8 +47,23 @@ general:
     value: ''
     description: Select a password for Jupyter Lab at the NVFlare Federated Server instance
 
-storage:
+hardware:
+  cpu_num:
+    name: Number of CPUs
+    value: 1
+    range: [1, 2]
 
+  ram:
+    name: RAM memory (in MB)
+    value: 2000
+    range: [2000, 4000]
+
+  disk:
+    name: Disk memory (in MB)
+    value: 1000
+    range: [1000, 2000]
+
+storage:
   rclone_conf:
     name: RCLONE configuration
     value: '/srv/.rclone/rclone.conf'
