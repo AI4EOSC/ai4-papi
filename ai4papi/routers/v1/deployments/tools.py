@@ -208,6 +208,9 @@ def create_deployment(
             reference=user_conf,
         )
 
+    # Utils validate conf
+    user_conf = utils.validate_conf(user_conf)
+
     # Check if the provided configuration is within the job quotas
     # Skip this check with CVAT because it does not have a "hardware" section in the conf
     if tool_name not in ['ai4os-cvat', 'ai4os-nvflare']:
@@ -432,15 +435,15 @@ def delete_deployment(
     )
 
     # Remove Vault secrets belonging to that deployment
-    r = ai4secrets.get_secrets(
+    secrets = ai4secrets.get_secrets(
         vo=vo,
         subpath=f"/deployments/{deployment_uuid}",
         authorization=SimpleNamespace(
             credentials=authorization.credentials,
         ),
     )
-    for path in r.keys():
-        r = ai4secrets.delete_secret(
+    for path in secrets.keys():
+        _ = ai4secrets.delete_secret(
             vo=vo,
             secret_path=path,
             authorization=SimpleNamespace(

@@ -24,12 +24,14 @@ This means you cannot name your modules like those names (eg. tags, detail, etc)
 
 import configparser
 import json
+import re
 from typing import Tuple, Union
 
 from cachetools import cached, TTLCache
 from fastapi import HTTPException, Query
 import requests
 
+from ai4papi import utils
 import ai4papi.conf as papiconf
 
 class Catalog:
@@ -245,7 +247,7 @@ class Catalog:
         items = self.get_items()
         if item_name not in items.keys():
             raise HTTPException(
-                status_code=400,
+                status_code=404,
                 detail=f"Item {item_name} not in catalog: {list(items.keys())}",
                 )
 
@@ -279,6 +281,19 @@ class Catalog:
 
         # Format "description" field nicely for the Dashboards Markdown parser
         metadata["description"] = "\n".join(metadata["description"])
+
+        # Replace some fields with the info gathered from Github
+        pattern = r'github\.com/([^/]+)/([^/]+?)(?:\.git|/)?$'
+        match = re.search(pattern, items[item_name]['url'])
+        if match:
+            owner, repo = match.group(1), match.group(2)
+            gh_info = utils.get_github_info(owner, repo)
+
+            metadata['date_creation'] = gh_info.get('created', '')
+            # metadata['updated'] = gh_info.get('updated', '')
+            metadata['license'] = gh_info.get('license', '')
+        else:
+            print(f"Failed to parse owner/repo in {items[item_name]['url']}")
 
         return metadata
 

@@ -217,6 +217,7 @@ def get_deployment(
         elif a['ClientStatus'] == 'unknown':
             info['status'] = 'down'
         else:
+            # This status can be for example: "complete", "failed"
             info['status'] = a['ClientStatus']
 
         # Add error messages if needed
@@ -273,7 +274,7 @@ def get_deployment(
         # Something happened, job didn't deploy (eg. job needs port that's currently being used)
         # We have to return `placement failures message`.
         info['status'] = 'error'
-        info['error_msg'] = f"{evals[0]['FailedTGAllocs']}"
+        info['error_msg'] = f"{evals[0].get('FailedTGAllocs', '')}"
 
     else:
         # info['error_msg'] = f"Job has not been yet evaluated. Contact with support sharing your job ID: {j['ID']}."
@@ -336,30 +337,29 @@ def delete_deployment(
 
     Returns a dict with status
     """
-    # Check the deployment exists
-    try:
-        j = Nomad.job.get_job(
-            id_=deployment_uuid,
-            namespace=namespace,
-            )
-    except exceptions.URLNotFoundNomadException:
-        raise HTTPException(
-            status_code=400,
-            detail="No deployment exists with this uuid.",
-            )
+    # Retrieve the deployment information. Under-the-hood it checks that:
+    # - the job indeed exists
+    # - the owner does indeed own the job
+    info = get_deployment(
+        deployment_uuid=deployment_uuid,
+        namespace=namespace,
+        owner=owner,
+        full_info=False,
+        )
 
-    # Check job does belong to owner
-    if j['Meta'] and owner != j['Meta'].get('owner', ''):
-        raise HTTPException(
-            status_code=400,
-            detail="You are not the owner of that deployment.",
-            )
+    # If job is in stuck status, allow deleting with purge.
+    # Most of the time, when a job is in this status, it is due to a platform error.
+    # It gets stuck and cannot be deleted without purge
+    if info['status'] in ['queued', 'complete', 'failed', 'error', 'down'] :
+        purge = True
+    else:
+        purge = False
 
     # Delete deployment
     Nomad.job.deregister_job(
         id_=deployment_uuid,
         namespace=namespace,
-        purge=False,
+        purge=purge,
         )
 
     return {'status': 'success'}
