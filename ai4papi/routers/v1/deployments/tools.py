@@ -395,10 +395,11 @@ def create_deployment(
                 'DISK': user_conf['hardware']['disk'],
                 'SHARED_MEMORY': user_conf['hardware']['ram'] * 10**6 * 0.5,
                 # Limit at 50% of RAM memory, in bytes
-                'NVFL_SERVER_JUPYTER_PASSWORD': user_conf['general']['server_jupyter_password'],
+                'NVFL_VERSION': user_conf['general']['nvfl_version'],
+                'NVFL_SERVER_JUPYTER_PASSWORD': user_conf['general']['nvfl_server_jupyter_password'],
                 'NVFL_DASHBOARD_USERNAME': user_conf['general']['nvfl_dashboard_username'],
                 'NVFL_DASHBOARD_PASSWORD': user_conf['general']['nvfl_dashboard_password'],
-                'NVFL_DASHBOARD_SERVER_SERVER1': user_conf['general']['nvfl_dashboard_server_server1'],
+                'NVFL_DASHBOARD_SERVER_SERVER1': '%s-server.${meta.domain}-%s' % (job_uuid, base_domain),
                 'NVFL_DASHBOARD_PROJECT_SHORT_NAME': user_conf['general']['nvfl_dashboard_project_short_name'],
                 'NVFL_DASHBOARD_PROJECT_TITLE': user_conf['general']['nvfl_dashboard_project_title'],
                 'NVFL_DASHBOARD_PROJECT_DESCRIPTION': user_conf['general']['nvfl_dashboard_project_description'],

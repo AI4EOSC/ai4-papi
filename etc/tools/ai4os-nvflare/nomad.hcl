@@ -24,7 +24,7 @@ job "tool-nvflare-${JOB_UUID}" {
     description                       = "${DESCRIPTION}"
     job_uuid                          = "${JOB_UUID}"
     hostname                          = "${meta.domain}-${BASE_DOMAIN}"
-    force_pull_images                 = false
+    force_pull_images                 = true
     #
     # NVFLARE Dashboard
     #
@@ -229,8 +229,8 @@ job "tool-nvflare-${JOB_UUID}" {
         NVFL_PROJECT_APP_LOCATION="${NVFL_DASHBOARD_PROJECT_APP_LOCATION}"
         NVFL_PROJECT_STARTING_DATE="${NVFL_DASHBOARD_PROJECT_STARTING_DATE}"
         NVFL_PROJECT_END_DATE="${NVFL_DASHBOARD_PROJECT_END_DATE}"
-        NVFL_PROJECT_PUBLIC="${NVFL_DASHBOARD_PROJECT_PUBLIC}"
-        NVFL_PROJECT_FROZEN="${NVFL_DASHBOARD_PROJECT_FROZEN}"
+        NVFL_PROJECT_PUBLIC=${NVFL_DASHBOARD_PROJECT_PUBLIC}
+        NVFL_PROJECT_FROZEN=${NVFL_DASHBOARD_PROJECT_FROZEN}
         VARIABLE_NAME="app"
       }
       config {
