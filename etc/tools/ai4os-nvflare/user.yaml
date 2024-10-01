@@ -27,20 +27,62 @@ general:
     value: ''
     description: Host where your application will be deployed. Selecting `myapp` will make your deployment accessible at `http://myapp.deployments.etc`). If not provided, hostname will automatically default to your `job-uuid`.
 
-#  docker_image:
-#    name: Docker image
-#    value: 'registry.services.ai4os.eu/ai4os/ai4-nvflare-server'
-#    description: Docker image to be used.
+  nvfl_version:
+    name: NVFlare version
+    value: '2.5.0'
+    options: ['2.5.0']
+    description: Select a version of the NVFlare.
 
-  dashboard_username:
+  nvfl_dashboard_username:
     name: NVFlare Dashboard username
     value: ''
     description: Select a username / email for admin in your NVFlare Dashboard instance.
 
-  dashboard_password:
+  nvfl_dashboard_password:
     name: NVFlare Dashboard password
     value: ''
     description: Select a password for admin in your NVFlare Dashboard instance.
+
+  nvfl_dashboard_project_short_name:
+    name: NVFlare project short name
+    value: ''
+    description: NVFlare project short name (maximum 16 characters, at top left, and used in certs)
+
+  nvfl_dashboard_project_title:
+    name: NVFlare project title
+    value: ''
+    description: NVFlare project title (on home page)
+
+  nvfl_dashboard_project_description:
+    name: NVFlare project description
+    value: ''
+    description: NVFlare project description
+
+  nvfl_dashboard_project_app_location:
+    name: NVFlare project docker image download link
+    value: ''
+    description: NVFlare project docker image download link
+
+  nvfl_dashboard_project_starting_date:
+    name: NVFlare project start date
+    value: ''
+    description: NVFlare project start date
+
+  nvfl_dashboard_project_end_date:
+    name: NVFlare project end date
+    value: ''
+    description: NVFlare project end date
+
+  nvfl_dashboard_project_public:
+    name: Make NVFlare project public
+    value: ''
+    description: If the project is public, user signup is enabled
+
+  nvfl_dashboard_project_frozen:
+    name: Make NVFlare project frozen
+    value: true
+    options: [true, false]
+    description: Once all the project values including the application configuartion and server configurations are set, freeze the project to create certificates based on the server configurations and allow users to download startup kits
 
   server_jupyter_password:
     name: Jupyter Lab password
@@ -88,3 +130,7 @@ storage:
   rclone_password:
     name: RCLONE user password
     value: ''
+
+  rclone_remote_path:
+    name: RCLONE remote path
+    value: '/ai4os-storage/tools/nvflare'

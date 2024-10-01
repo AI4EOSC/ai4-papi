@@ -22,19 +22,15 @@ job "tool-nvflare-${JOB_UUID}" {
     owner_email                       = "${OWNER_EMAIL}"
     title                             = "${TITLE}"
     description                       = "${DESCRIPTION}"
+    job_uuid                          = "${JOB_UUID}"
+    hostname                          = "${meta.domain}-${BASE_DOMAIN}"
+    force_pull_images                 = false
     #
-    # NVFlare-specific metadata
-    #
-    job_uuid                           = "${JOB_UUID}"
-    hostname                           = "${meta.domain}-${BASE_DOMAIN}"
-    force_pull_images                  = false
-    #
-    # dashboard
+    # NVFLARE Dashboard
     #
     image_dashboard                    = "registry.services.ai4os.eu/ai4os/ai4os-nvflare-dashboard"
-    dashboard_credentials              = "${NVFLARE_DASHBOARD_USERNAME}:${NVFLARE_DASHBOARD_PASSWORD}"
     #
-    # server
+    # NVFLARE Server
     #
     image_server                       = "registry.services.ai4os.eu/ai4os/ai4os-nvflare-server"
     RCLONE_CONFIG                      = "${RCLONE_CONFIG}"
@@ -43,6 +39,7 @@ job "tool-nvflare-${JOB_UUID}" {
     RCLONE_CONFIG_RSHARE_VENDOR        = "${RCLONE_CONFIG_RSHARE_VENDOR}"
     RCLONE_CONFIG_RSHARE_USER          = "${RCLONE_CONFIG_RSHARE_USER}"
     RCLONE_CONFIG_RSHARE_PASS          = "${RCLONE_CONFIG_RSHARE_PASS}"
+    RCLONE_REMOTE_PATH                 = "${RCLONE_REMOTE_PATH}"
   }
 
   # Only use nodes that have succesfully passed the ai4-nomad_tests (ie. meta.status=ready)
@@ -96,9 +93,6 @@ job "tool-nvflare-${JOB_UUID}" {
   group "usergroup" {
  
     network {
-      port "dashboard-api" {
-        to = 8443
-      }
       port "dashboard" {
         to = 80
       }
@@ -120,21 +114,10 @@ job "tool-nvflare-${JOB_UUID}" {
         "traefik.enable=true",
         "traefik.http.routers.${JOB_UUID}-dashboard.tls=true",
         "traefik.http.routers.${JOB_UUID}-dashboard.entrypoints=websecure",
-        "traefik.http.routers.${JOB_UUID}-dashboard.rule=Host(`dashboard-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`)",
+        "traefik.http.routers.${JOB_UUID}-dashboard.rule=Host(`${JOB_UUID}-dashboard.${meta.domain}-${BASE_DOMAIN}`)",
       ]
     }
- 
-    service {
-      name = "${JOB_UUID}-dashboard-api"
-      port = "dashboard-api"
-      tags = [
-        "traefik.enable=true",
-        "traefik.http.routers.${JOB_UUID}-dashboard-api.tls=true",
-        "traefik.http.routers.${JOB_UUID}-dashboard-api.entrypoints=websecure",
-        "traefik.http.routers.${JOB_UUID}-dashboard-api.rule=Host(`dashboard-api-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`)",
-      ]
-    }
- 
+
     service {
       name = "${JOB_UUID}-server-fl"
       port = "server-fl"
@@ -143,7 +126,7 @@ job "tool-nvflare-${JOB_UUID}" {
         "traefik.tcp.routers.${JOB_UUID}-server-fl.tls=true",
         "traefik.tcp.routers.${JOB_UUID}-server-fl.tls.passthrough=true",
         "traefik.tcp.routers.${JOB_UUID}-server-fl.entrypoints=nvflare_fl",
-        "traefik.tcp.routers.${JOB_UUID}-server-fl.rule=HostSNI(`server-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`)",
+        "traefik.tcp.routers.${JOB_UUID}-server-fl.rule=HostSNI(`${JOB_UUID}-server.${meta.domain}-${BASE_DOMAIN}`)",
       ]
     }
  
@@ -155,7 +138,7 @@ job "tool-nvflare-${JOB_UUID}" {
         "traefik.tcp.routers.${JOB_UUID}-server-admin.tls=true",
         "traefik.tcp.routers.${JOB_UUID}-server-admin.tls.passthrough=true",
         "traefik.tcp.routers.${JOB_UUID}-server-admin.entrypoints=nvflare_admin",
-        "traefik.tcp.routers.${JOB_UUID}-server-admin.rule=HostSNI(`server-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`)",
+        "traefik.tcp.routers.${JOB_UUID}-server-admin.rule=HostSNI(`${JOB_UUID}-server.${meta.domain}-${BASE_DOMAIN}`)",
       ]
     }
  
@@ -166,7 +149,7 @@ job "tool-nvflare-${JOB_UUID}" {
         "traefik.enable=true",
         "traefik.http.routers.${JOB_UUID}-server-jupyter.tls=true",
         "traefik.http.routers.${JOB_UUID}-server-jupyter.entrypoints=websecure",
-        "traefik.http.routers.${JOB_UUID}-server-jupyter.rule=Host(`server-${HOSTNAME}.${meta.domain}-${BASE_DOMAIN}`)",
+        "traefik.http.routers.${JOB_UUID}-server-jupyter.rule=Host(`${JOB_UUID}-server.${meta.domain}-${BASE_DOMAIN}`)",
       ]
     }
 
@@ -187,14 +170,15 @@ job "tool-nvflare-${JOB_UUID}" {
         RCLONE_CONFIG_RSHARE_VENDOR = "${NOMAD_META_RCLONE_CONFIG_RSHARE_VENDOR}"
         RCLONE_CONFIG_RSHARE_USER   = "${NOMAD_META_RCLONE_CONFIG_RSHARE_USER}"
         RCLONE_CONFIG_RSHARE_PASS   = "${NOMAD_META_RCLONE_CONFIG_RSHARE_PASS}"
-        REMOTE_PATH                 = "rshare:/nvflare-instances/${JOB_UUID}.${meta.domain}-${BASE_DOMAIN}"
+        REMOTE_PATH                 = "rshare:${NOMAD_META_RCLONE_REMOTE_PATH}"
         LOCAL_PATH                  = "/storage"
       }
       config {
-        image   = "ignacioheredia/ai4-docker-storage"
-        privileged = true
+        force_pull  = true
+        image       = "registry.services.ai4os.eu/ai4os/docker-storage:latest"
+        privileged  = true
         volumes = [
-          "/nomad-storage/${JOB_UUID}.${meta.domain}-${BASE_DOMAIN}:/storage:shared",
+          "..${NOMAD_ALLOC_DIR}/data/storage:/storage:rshared"
         ]
         mount {
           type = "bind"
@@ -233,30 +217,26 @@ job "tool-nvflare-${JOB_UUID}" {
       }
     }
      
-    task "storagecleanup" {
-      lifecycle {
-        hook = "poststop"
-      }
-      driver = "raw_exec"
-      config {
-        command = "/bin/bash"
-        args = [
-          "-c",
-          "sudo umount /nomad-storage/${JOB_UUID}.${meta.domain}-${BASE_DOMAIN} && sudo rmdir /nomad-storage/${JOB_UUID}.${meta.domain}-${BASE_DOMAIN}"
-        ]
-      }
-    }
-     
     task "dashboard" {
       driver = "docker"
       env {
-        NVFL_CREDENTIAL = "${NOMAD_META_dashboard_credentials}"
-        VARIABLE_NAME = "app"
+        NVFL_CREDENTIAL="${NVFL_DASHBOARD_USERNAME}:${NVFL_DASHBOARD_PASSWORD}"
+        NVFL_SERVER1="${NVFL_DASHBOARD_SERVER_SERVER1}"
+        NVFL_SERVER2="${NVFL_DASHBOARD_SERVER_SERVER2}"
+        NVFL_PROJECT_SHORT_NAME="${NVFL_DASHBOARD_PROJECT_SHORT_NAME}"
+        NVFL_PROJECT_TITLE="${NVFL_DASHBOARD_PROJECT_TITLE}"
+        NVFL_PROJECT_DESCRIPTION="${NVFL_DASHBOARD_PROJECT_DESCRIPTION}"
+        NVFL_PROJECT_APP_LOCATION="${NVFL_DASHBOARD_PROJECT_APP_LOCATION}"
+        NVFL_PROJECT_STARTING_DATE="${NVFL_DASHBOARD_PROJECT_STARTING_DATE}"
+        NVFL_PROJECT_END_DATE="${NVFL_DASHBOARD_PROJECT_END_DATE}"
+        NVFL_PROJECT_PUBLIC="${NVFL_DASHBOARD_PROJECT_PUBLIC}"
+        NVFL_PROJECT_FROZEN="${NVFL_DASHBOARD_PROJECT_FROZEN}"
+        VARIABLE_NAME="app"
       }
       config {
-        image = "${NOMAD_META_image_dashboard}"
+        image = "${NOMAD_META_image_dashboard}:${NVFL_VERSION}"
         force_pull = "${NOMAD_META_force_pull_images}"
-        ports = ["dashboard", "dashboard-api"]
+        ports = ["dashboard"]
         volumes = [
           "/nomad-storage/${JOB_UUID}.${meta.domain}-${BASE_DOMAIN}/dashboard:/var/tmp/nvflare/dashboard:shared",
         ]
@@ -266,7 +246,7 @@ job "tool-nvflare-${JOB_UUID}" {
     task "server" {
       driver = "docker"
       config {
-        image = "${NOMAD_META_image_server}"
+        image = "${NOMAD_META_image_server}:${NVFL_VERSION}"
         force_pull = "${NOMAD_META_force_pull_images}"
         ports = ["server-fl", "server-admin", "server-jupyter"]
         shm_size = ${SHARED_MEMORY}
@@ -281,7 +261,7 @@ job "tool-nvflare-${JOB_UUID}" {
         args = [
           # passwd: server
           # how to generate password: python3 -c "from jupyter_server.auth import passwd; print(passwd('server'))"
-          "--ServerApp.password='${NVFLARE_SERVER_JUPYTER_PASSWORD}'",
+          "--ServerApp.password='${NVFL_SERVER_JUPYTER_PASSWORD}'",
           "--port=8888",
           "--ip=0.0.0.0",
           "--notebook-dir=/tf",

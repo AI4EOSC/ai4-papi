@@ -349,8 +349,8 @@ def create_deployment(
                 'RCLONE_CONFIG_RSHARE_VENDOR': user_conf['storage']['rclone_vendor'],
                 'RCLONE_CONFIG_RSHARE_USER': user_conf['storage']['rclone_user'],
                 'RCLONE_CONFIG_RSHARE_PASS': user_conf['storage']['rclone_password'],
-                'RCLONE_CONFIG': user_conf['storage']['rclone_conf'],
-                }
+                'RCLONE_CONFIG': user_conf['storage']['rclone_conf']
+            }
         )
 
         # Convert template to Nomad conf
@@ -395,7 +395,24 @@ def create_deployment(
                 'DISK': user_conf['hardware']['disk'],
                 'SHARED_MEMORY': user_conf['hardware']['ram'] * 10**6 * 0.5,
                 # Limit at 50% of RAM memory, in bytes
-                'NVFLARE_SERVER_JUPYTER_PASSWORD': user_conf['general']['server_jupyter_password']
+                'NVFL_SERVER_JUPYTER_PASSWORD': user_conf['general']['server_jupyter_password'],
+                'NVFL_DASHBOARD_USERNAME': user_conf['general']['nvfl_dashboard_username'],
+                'NVFL_DASHBOARD_PASSWORD': user_conf['general']['nvfl_dashboard_password'],
+                'NVFL_DASHBOARD_SERVER_SERVER1': user_conf['general']['nvfl_dashboard_server_server1'],
+                'NVFL_DASHBOARD_PROJECT_SHORT_NAME': user_conf['general']['nvfl_dashboard_project_short_name'],
+                'NVFL_DASHBOARD_PROJECT_TITLE': user_conf['general']['nvfl_dashboard_project_title'],
+                'NVFL_DASHBOARD_PROJECT_DESCRIPTION': user_conf['general']['nvfl_dashboard_project_description'],
+                'NVFL_DASHBOARD_PROJECT_APP_LOCATION': user_conf['general']['nvfl_dashboard_project_app_location'],
+                'NVFL_DASHBOARD_PROJECT_STARTING_DATE': user_conf['general']['nvfl_dashboard_project_starting_date'],
+                'NVFL_DASHBOARD_PROJECT_END_DATE': user_conf['general']['nvfl_dashboard_project_end_date'],
+                'NVFL_DASHBOARD_PROJECT_PUBLIC': user_conf['general']['nvfl_dashboard_project_public'],
+                'NVFL_DASHBOARD_PROJECT_FROZEN': user_conf['general']['nvfl_dashboard_project_frozen'],
+                'RCLONE_CONFIG_RSHARE_URL': user_conf['storage']['rclone_url'],
+                'RCLONE_CONFIG_RSHARE_VENDOR': user_conf['storage']['rclone_vendor'],
+                'RCLONE_CONFIG_RSHARE_USER': user_conf['storage']['rclone_user'],
+                'RCLONE_CONFIG_RSHARE_PASS': user_conf['storage']['rclone_password'],
+                'RCLONE_CONFIG': user_conf['storage']['rclone_conf'],
+                'RCLONE_REMOTE_PATH': user_conf['storage']['rclone_remote_path']
             }
         )
 
