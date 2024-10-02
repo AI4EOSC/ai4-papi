@@ -39,7 +39,7 @@ job "tool-nvflare-${JOB_UUID}" {
     RCLONE_CONFIG_RSHARE_VENDOR        = "${RCLONE_CONFIG_RSHARE_VENDOR}"
     RCLONE_CONFIG_RSHARE_USER          = "${RCLONE_CONFIG_RSHARE_USER}"
     RCLONE_CONFIG_RSHARE_PASS          = "${RCLONE_CONFIG_RSHARE_PASS}"
-    RCLONE_REMOTE_PATH                 = "${RCLONE_REMOTE_PATH}"
+    RCLONE_REMOTE_PATH                 = "${RCLONE_REMOTE_PATH}/${JOB_UUID}"
   }
 
   # Only use nodes that have succesfully passed the ai4-nomad_tests (ie. meta.status=ready)
@@ -163,6 +163,7 @@ job "tool-nvflare-${JOB_UUID}" {
         sidecar = "true"
       }
       driver = "docker"
+      kill_timeout = "30s"
       env {
         RCLONE_CONFIG               = "${NOMAD_META_RCLONE_CONFIG}"
         RCLONE_CONFIG_RSHARE_TYPE   = "webdav"
@@ -207,7 +208,19 @@ job "tool-nvflare-${JOB_UUID}" {
       template {
         data = <<-EOF
         export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $RCLONE_CONFIG_RSHARE_PASS)
-        rclone mount $REMOTE_PATH $LOCAL_PATH --allow-non-empty --allow-other --vfs-cache-mode full
+        dirs='dashboard server'
+        for dir in $dirs; do
+            echo "initializing: $LOCAL_PATH/$dir"
+            rm -rf $LOCAL_PATH/$dir
+            mkdir -p $LOCAL_PATH/$dir
+            echo "initializing: $REMOTE_PATH/$dir"
+            rclone mkdir --log-level DEBUG $REMOTE_PATH/$dir
+        done
+        echo "mounting storage: $REMOTE_PATH <+> $LOCAL_PATH"
+        rclone mount --log-level DEBUG $REMOTE_PATH $LOCAL_PATH \
+            --allow-non-empty \
+            --allow-other \
+            --vfs-cache-mode full
         EOF
         destination = "local/mount_storage.sh"
       }
@@ -240,13 +253,62 @@ job "tool-nvflare-${JOB_UUID}" {
         force_pull = "${NOMAD_META_force_pull_images}"
         ports = ["dashboard"]
         volumes = [
-          "/nomad-storage/${JOB_UUID}.${meta.domain}-${BASE_DOMAIN}/dashboard:/var/tmp/nvflare/dashboard:shared",
+          "..${NOMAD_ALLOC_DIR}/data/dashboard:/var/tmp/nvflare/dashboard",
         ]
       }
     }
  
     task "server" {
+      lifecycle {
+        hook = "poststart"
+        sidecar = "true"
+      }
       driver = "docker"
+      template {
+        data = <<-EOF
+        #!/bin/bash
+        PIN='123456'
+        retries=10
+        while [[ $retries > 0 ]]; do
+        	# 1) login to the dashboard
+					resp=$( \
+						curl \
+							-X POST \
+							-H 'Content-type: application/json' \
+							-d '{"email":"'${NVFL_DASHBOARD_USERNAME}'", "password": "'${NVFL_DASHBOARD_PASSWORD}'"}' \
+							https://${JOB_UUID}-dashboard.${meta.domain}-${BASE_DOMAIN}/api/v1/login \
+					)
+					if [ ! $(echo -n "$resp" | jq -r '.status') == 'ok' ]; then
+						echo "$resp" | jq
+						retries=$((retries-1))
+						continue
+					fi
+					access_token=$(echo -n "$resp" | jq -r '.access_token')
+					# 2) download server startup kit (primary)
+					resp=$(\
+						curl \
+							-X POST \
+							-L \
+							-O \
+							-J \
+							-H 'Authorization: Bearer '$access_token \
+							-H 'Content-type: application/json' \
+							-d '{"pin":"'$PIN'"}' \
+							https://${JOB_UUID}-dashboard.${meta.domain}-${BASE_DOMAIN}/api/v1/servers/1/blob \
+					)
+					filename=$(echo -n "$resp" | sed -En 's/^.+?filename\s+\x27([^\x27]+)\x27.*$/\1/p')
+					if [ ! -f $filename ]; then
+						echo "file not found: $filename"
+						retries=$((retries-1))
+						continue
+					fi
+					# 3) unzip server startup description
+					unzip -P $PIN server1.zip
+					retries=0
+        done
+        EOF
+        destination = "local/init_fl_server.sh"
+      }
       config {
         image = "${NOMAD_META_image_server}:${NVFL_VERSION}"
         force_pull = "${NOMAD_META_force_pull_images}"
@@ -257,7 +319,7 @@ job "tool-nvflare-${JOB_UUID}" {
           size = "${DISK}M"
         }
         volumes = [
-          "/nomad-storage/${JOB_UUID}.${meta.domain}-${BASE_DOMAIN}/server/tf:/tf:shared",
+          "..${NOMAD_ALLOC_DIR}/data/server/tf:/tf",
         ]
         command = "jupyter-lab"
         args = [
@@ -271,7 +333,6 @@ job "tool-nvflare-${JOB_UUID}" {
           "--allow-root"
         ]
       }
-
       resources {
         cores  = ${CPU_NUM}
         memory = ${RAM}

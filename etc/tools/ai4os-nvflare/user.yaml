@@ -29,8 +29,8 @@ general:
 
   nvfl_version:
     name: NVFlare version
-    value: '2.5.0'
-    options: ['2.5.0']
+    value: '2.5-Stifo'
+    options: ['2.5.0', '2.5-Stifo']
     description: Select a version of the NVFlare.
 
   nvfl_dashboard_username:
