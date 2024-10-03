@@ -22,8 +22,7 @@ job "tool-nvflare-${JOB_UUID}" {
     owner_email                       = "${OWNER_EMAIL}"
     title                             = "${TITLE}"
     description                       = "${DESCRIPTION}"
-    job_uuid                          = "${JOB_UUID}"
-    hostname                          = "${meta.domain}-${BASE_DOMAIN}"
+    domain_name                       = "${meta.domain}-${BASE_DOMAIN}"
     force_pull_images                 = true
     #
     # NVFLARE Dashboard
@@ -114,7 +113,7 @@ job "tool-nvflare-${JOB_UUID}" {
         "traefik.enable=true",
         "traefik.http.routers.${JOB_UUID}-dashboard.tls=true",
         "traefik.http.routers.${JOB_UUID}-dashboard.entrypoints=websecure",
-        "traefik.http.routers.${JOB_UUID}-dashboard.rule=Host(`${JOB_UUID}-dashboard.${meta.domain}-${BASE_DOMAIN}`)",
+        "traefik.http.routers.${JOB_UUID}-dashboard.rule=Host(`${JOB_UUID}-dashboard.${NOMAD_META_domain_name}`)",
       ]
     }
 
@@ -126,7 +125,7 @@ job "tool-nvflare-${JOB_UUID}" {
         "traefik.tcp.routers.${JOB_UUID}-server-fl.tls=true",
         "traefik.tcp.routers.${JOB_UUID}-server-fl.tls.passthrough=true",
         "traefik.tcp.routers.${JOB_UUID}-server-fl.entrypoints=nvflare_fl",
-        "traefik.tcp.routers.${JOB_UUID}-server-fl.rule=HostSNI(`${JOB_UUID}-server.${meta.domain}-${BASE_DOMAIN}`)",
+        "traefik.tcp.routers.${JOB_UUID}-server-fl.rule=HostSNI(`${JOB_UUID}-server.${NOMAD_META_domain_name}`)",
       ]
     }
  
@@ -138,7 +137,7 @@ job "tool-nvflare-${JOB_UUID}" {
         "traefik.tcp.routers.${JOB_UUID}-server-admin.tls=true",
         "traefik.tcp.routers.${JOB_UUID}-server-admin.tls.passthrough=true",
         "traefik.tcp.routers.${JOB_UUID}-server-admin.entrypoints=nvflare_admin",
-        "traefik.tcp.routers.${JOB_UUID}-server-admin.rule=HostSNI(`${JOB_UUID}-server.${meta.domain}-${BASE_DOMAIN}`)",
+        "traefik.tcp.routers.${JOB_UUID}-server-admin.rule=HostSNI(`${JOB_UUID}-server.${NOMAD_META_domain_name}`)",
       ]
     }
  
@@ -149,7 +148,7 @@ job "tool-nvflare-${JOB_UUID}" {
         "traefik.enable=true",
         "traefik.http.routers.${JOB_UUID}-server-jupyter.tls=true",
         "traefik.http.routers.${JOB_UUID}-server-jupyter.entrypoints=websecure",
-        "traefik.http.routers.${JOB_UUID}-server-jupyter.rule=Host(`${JOB_UUID}-server.${meta.domain}-${BASE_DOMAIN}`)",
+        "traefik.http.routers.${JOB_UUID}-server-jupyter.rule=Host(`${JOB_UUID}-server.${NOMAD_META_domain_name}`)",
       ]
     }
 
@@ -231,6 +230,7 @@ job "tool-nvflare-${JOB_UUID}" {
     }
      
     task "dashboard" {
+      # TODO: persistence
       driver = "docker"
       env {
         NVFL_CREDENTIAL="${NVFL_DASHBOARD_USERNAME}:${NVFL_DASHBOARD_PASSWORD}"
@@ -259,6 +259,7 @@ job "tool-nvflare-${JOB_UUID}" {
     }
  
     task "server" {
+      # TODO: persistence
       lifecycle {
         hook = "poststart"
         sidecar = "true"
@@ -269,45 +270,76 @@ job "tool-nvflare-${JOB_UUID}" {
         #!/bin/bash
         PIN='123456'
         retries=10
+        fl_server_dir=''
         while [[ $retries > 0 ]]; do
-        	# 1) login to the dashboard
-					resp=$( \
-						curl \
-							-X POST \
-							-H 'Content-type: application/json' \
-							-d '{"email":"'${NVFL_DASHBOARD_USERNAME}'", "password": "'${NVFL_DASHBOARD_PASSWORD}'"}' \
-							https://${JOB_UUID}-dashboard.${meta.domain}-${BASE_DOMAIN}/api/v1/login \
-					)
-					if [ ! $(echo -n "$resp" | jq -r '.status') == 'ok' ]; then
-						echo "$resp" | jq
-						retries=$((retries-1))
-						continue
-					fi
-					access_token=$(echo -n "$resp" | jq -r '.access_token')
-					# 2) download server startup kit (primary)
-					resp=$(\
-						curl \
-							-X POST \
-							-L \
-							-O \
-							-J \
-							-H 'Authorization: Bearer '$access_token \
-							-H 'Content-type: application/json' \
-							-d '{"pin":"'$PIN'"}' \
-							https://${JOB_UUID}-dashboard.${meta.domain}-${BASE_DOMAIN}/api/v1/servers/1/blob \
-					)
-					filename=$(echo -n "$resp" | sed -En 's/^.+?filename\s+\x27([^\x27]+)\x27.*$/\1/p')
-					if [ ! -f $filename ]; then
-						echo "file not found: $filename"
-						retries=$((retries-1))
-						continue
-					fi
-					# 3) unzip server startup description
-					unzip -P $PIN server1.zip
-					retries=0
+          # 1) login to the dashboard
+          resp=$( \
+            curl \
+              -X POST \
+              -H 'Content-type: application/json' \
+              -d '{"email":"'${NVFL_DASHBOARD_USERNAME}'", "password": "'${NVFL_DASHBOARD_PASSWORD}'"}' \
+              https://${JOB_UUID}-dashboard.$${NOMAD_META_domain_name}/api/v1/login \
+          )
+          if [ ! $(echo -n "$resp" | jq -r '.status') == 'ok' ]; then
+            echo "$resp" | jq
+            retries=$((retries-1))
+            continue
+          fi
+          access_token=$(echo -n "$resp" | jq -r '.access_token')
+          # 2) download server startup kit (primary)
+          resp=$(\
+            curl \
+              -X POST \
+              -L \
+              -O \
+              -J \
+              -H 'Authorization: Bearer '$access_token \
+              -H 'Content-type: application/json' \
+              -d '{"pin":"'$PIN'"}' \
+              https://${JOB_UUID}-dashboard.$${NOMAD_META_domain_name}/api/v1/servers/1/blob \
+          )
+          filename=$(echo -n "$resp" | sed -En 's/^.+?filename\s+\x27([^\x27]+)\x27.*$/\1/p')
+          if [ ! -f $filename ]; then
+            echo "file not found: $filename"
+            retries=$((retries-1))
+            continue
+          fi
+          # 3) unzip server startup kit
+          echo "filename: $filename"
+          unzip -P $PIN $filename
+          fl_server_dir=$(echo -n "$filename" | sed -En 's/^(.+)\.zip$/\1/p')
+          if [ ! -d $fl_server_dir ]; then
+            echo "directory not found: $fl_servet_dir"
+            continue
+          fi
+          retries=0
         done
+        if [ -d $fl_server_dir ]; then
+          # 4) start the FL server
+          cd $fl_server_dir/startup
+          ./start.sh
+        else
+          echo "failed to start the FL server"
+        fi
         EOF
         destination = "local/init_fl_server.sh"
+        perms = "750"
+      }
+      template {
+        # TODO: ServerApp.password config is deprecated in 2.0. Use PasswordIdentityProvider.hashed_password
+        data = <<-EOF
+        #!/bin/bash
+        ./init_fl_server.sh
+        jupyter-lab \
+          --ServerApp.password=`python3 -c "from jupyter_server.auth import passwd; print(passwd('${NVFL_SERVER_JUPYTER_PASSWORD}'))"` \
+          --port=8888 \
+          --ip=0.0.0.0 \
+          --notebook-dir=/tf \
+          --no-browser \
+          --allow-root
+        EOF
+        destination = "local/entrypoint.sh"
+        perms = "750"
       }
       config {
         image = "${NOMAD_META_image_server}:${NVFL_VERSION}"
@@ -321,16 +353,22 @@ job "tool-nvflare-${JOB_UUID}" {
         volumes = [
           "..${NOMAD_ALLOC_DIR}/data/server/tf:/tf",
         ]
-        command = "jupyter-lab"
+        mount {
+          type = "bind"
+          target = "/workspace/init_fl_server.sh"
+          source = "local/init_fl_server.sh"
+          readonly = true
+        }
+        mount {
+          type = "bind"
+          target = "/workspace/entrypoint.sh"
+          source = "local/entrypoint.sh"
+          readonly = true
+        }
+        command = "/bin/bash"
         args = [
-          # passwd: server
-          # how to generate password: python3 -c "from jupyter_server.auth import passwd; print(passwd('server'))"
-          "--ServerApp.password='${NVFL_SERVER_JUPYTER_PASSWORD}'",
-          "--port=8888",
-          "--ip=0.0.0.0",
-          "--notebook-dir=/tf",
-          "--no-browser",
-          "--allow-root"
+          "-c",
+          "/workspace/entrypoint.sh"
         ]
       }
       resources {
