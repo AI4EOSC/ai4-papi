@@ -177,9 +177,6 @@ job "tool-nvflare-${JOB_UUID}" {
         force_pull  = true
         image       = "registry.services.ai4os.eu/ai4os/docker-storage:latest"
         privileged  = true
-        volumes = [
-          "..${NOMAD_ALLOC_DIR}/data/storage:/storage:rshared"
-        ]
         mount {
           type = "bind"
           target = "/srv/.rclone/rclone.conf"
@@ -192,6 +189,9 @@ job "tool-nvflare-${JOB_UUID}" {
           source = "local/mount_storage.sh"
           readonly = false
         }
+        volumes = [
+          "..${NOMAD_ALLOC_DIR}/data/storage:/storage:rshared",
+        ]
       }
       template {
         data = <<-EOF
@@ -253,7 +253,7 @@ job "tool-nvflare-${JOB_UUID}" {
         force_pull = "${NOMAD_META_force_pull_images}"
         ports = ["dashboard"]
         volumes = [
-          "..${NOMAD_ALLOC_DIR}/data/dashboard:/var/tmp/nvflare/dashboard",
+          "..${NOMAD_ALLOC_DIR}/data/storage/dashboard:/var/tmp/nvflare/dashboard:rshared",
         ]
       }
     }
@@ -351,7 +351,7 @@ job "tool-nvflare-${JOB_UUID}" {
           size = "${DISK}M"
         }
         volumes = [
-          "..${NOMAD_ALLOC_DIR}/data/server/tf:/tf",
+          "..${NOMAD_ALLOC_DIR}/data/storage/server/tf:/tf:rshared",
         ]
         mount {
           type = "bind"
