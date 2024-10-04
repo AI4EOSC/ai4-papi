@@ -230,7 +230,7 @@ job "tool-nvflare-${JOB_UUID}" {
     }
      
     task "dashboard" {
-      # TODO: persistence
+      # TODO: persistence - adjust wsgi.py of the NVFLARE Dashboad to recover from an existing DB
       driver = "docker"
       env {
         NVFL_CREDENTIAL="${NVFL_DASHBOARD_USERNAME}:${NVFL_DASHBOARD_PASSWORD}"
@@ -252,9 +252,10 @@ job "tool-nvflare-${JOB_UUID}" {
         image = "${NOMAD_META_image_dashboard}:${NVFL_VERSION}"
         force_pull = "${NOMAD_META_force_pull_images}"
         ports = ["dashboard"]
-        volumes = [
-          "..${NOMAD_ALLOC_DIR}/data/storage/dashboard:/var/tmp/nvflare/dashboard:rshared",
-        ]
+        # uncomment for persistence
+        #volumes = [
+        #  "..${NOMAD_ALLOC_DIR}/data/storage/dashboard:/var/tmp/nvflare/dashboard:rshared",
+        #]
       }
     }
  
@@ -350,9 +351,10 @@ job "tool-nvflare-${JOB_UUID}" {
         storage_opt = {
           size = "${DISK}M"
         }
-        volumes = [
-          "..${NOMAD_ALLOC_DIR}/data/storage/server/tf:/tf:rshared",
-        ]
+        # uncomment for persistence
+        #volumes = [
+        #  "..${NOMAD_ALLOC_DIR}/data/storage/server/tf:/tf:rshared",
+        #]
         mount {
           type = "bind"
           target = "/workspace/init_fl_server.sh"
