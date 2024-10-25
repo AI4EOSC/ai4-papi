@@ -18,8 +18,8 @@ security = HTTPBearer()
 
 # For now, we use for everyone the official EGI Vault server.
 # We can reconsider this is we start using the IAM in auth.
-VAULT_ADDR = "https://vault.services.fedcloud.eu:8200"
-VAULT_AUTH_PATH = "jwt"
+VAULT_ADDR = "https://secrets.services.ai4os.eu:8200"
+VAULT_AUTH_PATH = "jwt-egi-demo"
 VAULT_ROLE = ""
 VAULT_MOUNT_POINT = "/secrets/"
 
