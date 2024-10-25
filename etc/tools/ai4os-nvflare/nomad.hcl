@@ -22,16 +22,11 @@ job "tool-nvflare-${JOB_UUID}" {
     owner_email                       = "${OWNER_EMAIL}"
     title                             = "${TITLE}"
     description                       = "${DESCRIPTION}"
-    domain_name                       = "${meta.domain}-${BASE_DOMAIN}"
     force_pull_images                 = true
+    meta_domain												= "${meta.domain}"
     #
-    # NVFLARE Dashboard
+    # rclone
     #
-    image_dashboard                    = "registry.services.ai4os.eu/ai4os/ai4os-nvflare-dashboard"
-    #
-    # NVFLARE Server
-    #
-    image_server                       = "registry.services.ai4os.eu/ai4os/ai4os-nvflare-server"
     RCLONE_CONFIG                      = "${RCLONE_CONFIG}"
     RCLONE_CONFIG_RSHARE_TYPE          = "webdav"
     RCLONE_CONFIG_RSHARE_URL           = "${RCLONE_CONFIG_RSHARE_URL}"
@@ -113,7 +108,7 @@ job "tool-nvflare-${JOB_UUID}" {
         "traefik.enable=true",
         "traefik.http.routers.${JOB_UUID}-dashboard.tls=true",
         "traefik.http.routers.${JOB_UUID}-dashboard.entrypoints=websecure",
-        "traefik.http.routers.${JOB_UUID}-dashboard.rule=Host(`${JOB_UUID}-dashboard.${NOMAD_META_domain_name}`)",
+        "traefik.http.routers.${JOB_UUID}-dashboard.rule=Host(`${JOB_UUID}-dashboard.${meta.domain}-${BASE_DOMAIN}`)",
       ]
     }
 
@@ -125,7 +120,7 @@ job "tool-nvflare-${JOB_UUID}" {
         "traefik.tcp.routers.${JOB_UUID}-server-fl.tls=true",
         "traefik.tcp.routers.${JOB_UUID}-server-fl.tls.passthrough=true",
         "traefik.tcp.routers.${JOB_UUID}-server-fl.entrypoints=nvflare_fl",
-        "traefik.tcp.routers.${JOB_UUID}-server-fl.rule=HostSNI(`${JOB_UUID}-server.${NOMAD_META_domain_name}`)",
+        "traefik.tcp.routers.${JOB_UUID}-server-fl.rule=HostSNI(`${JOB_UUID}-server.${meta.domain}-${BASE_DOMAIN}`)",
       ]
     }
  
@@ -137,7 +132,7 @@ job "tool-nvflare-${JOB_UUID}" {
         "traefik.tcp.routers.${JOB_UUID}-server-admin.tls=true",
         "traefik.tcp.routers.${JOB_UUID}-server-admin.tls.passthrough=true",
         "traefik.tcp.routers.${JOB_UUID}-server-admin.entrypoints=nvflare_admin",
-        "traefik.tcp.routers.${JOB_UUID}-server-admin.rule=HostSNI(`${JOB_UUID}-server.${NOMAD_META_domain_name}`)",
+        "traefik.tcp.routers.${JOB_UUID}-server-admin.rule=HostSNI(`${JOB_UUID}-server.${meta.domain}-${BASE_DOMAIN}`)",
       ]
     }
  
@@ -148,86 +143,86 @@ job "tool-nvflare-${JOB_UUID}" {
         "traefik.enable=true",
         "traefik.http.routers.${JOB_UUID}-server-jupyter.tls=true",
         "traefik.http.routers.${JOB_UUID}-server-jupyter.entrypoints=websecure",
-        "traefik.http.routers.${JOB_UUID}-server-jupyter.rule=Host(`${JOB_UUID}-server.${NOMAD_META_domain_name}`)",
+        "traefik.http.routers.${JOB_UUID}-server-jupyter.rule=Host(`${JOB_UUID}-server.${meta.domain}-${BASE_DOMAIN}`)",
       ]
     }
 
     ephemeral_disk {
       size = ${DISK}
     }
- 
-    task "storagetask" {
-      lifecycle {
-        hook = "prestart"
-        sidecar = "true"
-      }
-      driver = "docker"
-      kill_timeout = "30s"
-      env {
-        RCLONE_CONFIG               = "${NOMAD_META_RCLONE_CONFIG}"
-        RCLONE_CONFIG_RSHARE_TYPE   = "webdav"
-        RCLONE_CONFIG_RSHARE_URL    = "${NOMAD_META_RCLONE_CONFIG_RSHARE_URL}"
-        RCLONE_CONFIG_RSHARE_VENDOR = "${NOMAD_META_RCLONE_CONFIG_RSHARE_VENDOR}"
-        RCLONE_CONFIG_RSHARE_USER   = "${NOMAD_META_RCLONE_CONFIG_RSHARE_USER}"
-        RCLONE_CONFIG_RSHARE_PASS   = "${NOMAD_META_RCLONE_CONFIG_RSHARE_PASS}"
-        REMOTE_PATH                 = "rshare:${NOMAD_META_RCLONE_REMOTE_PATH}"
-        LOCAL_PATH                  = "/storage"
-      }
-      config {
-        force_pull  = true
-        image       = "registry.services.ai4os.eu/ai4os/docker-storage:latest"
-        privileged  = true
-        mount {
-          type = "bind"
-          target = "/srv/.rclone/rclone.conf"
-          source = "local/rclone.conf"
-          readonly = false
-        }
-        mount {
-          type = "bind"
-          target = "/mount_storage.sh"
-          source = "local/mount_storage.sh"
-          readonly = false
-        }
-        volumes = [
-          "..${NOMAD_ALLOC_DIR}/data/storage:/storage:rshared",
-        ]
-      }
-      template {
-        data = <<-EOF
-        [ai4eosc-share]
-        type = webdav
-        url = https://share.services.ai4os.eu/remote.php/dav
-        vendor = nextcloud
-        user = ${NOMAD_META_RCLONE_CONFIG_RSHARE_USER}
-        pass = ${NOMAD_META_RCLONE_CONFIG_RSHARE_PASS}
-        EOF
-        destination = "local/rclone.conf"
-      }
-      template {
-        data = <<-EOF
-        export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $RCLONE_CONFIG_RSHARE_PASS)
-        dirs='dashboard server'
-        for dir in $dirs; do
-            echo "initializing: $LOCAL_PATH/$dir"
-            rm -rf $LOCAL_PATH/$dir
-            mkdir -p $LOCAL_PATH/$dir
-            echo "initializing: $REMOTE_PATH/$dir"
-            rclone mkdir --log-level DEBUG $REMOTE_PATH/$dir
-        done
-        echo "mounting storage: $REMOTE_PATH <+> $LOCAL_PATH"
-        rclone mount --log-level DEBUG $REMOTE_PATH $LOCAL_PATH \
-            --allow-non-empty \
-            --allow-other \
-            --vfs-cache-mode full
-        EOF
-        destination = "local/mount_storage.sh"
-      }
-      resources {
-        cpu    = 50        # minimum number of CPU MHz is 2
-        memory = 2000
-      }
-    }
+# uncomment for persistence
+#     task "storagetask" {
+#       lifecycle {
+#         hook = "prestart"
+#         sidecar = "true"
+#       }
+#       driver = "docker"
+#       kill_timeout = "30s"
+#       env {
+#         RCLONE_CONFIG               = "${NOMAD_META_RCLONE_CONFIG}"
+#         RCLONE_CONFIG_RSHARE_TYPE   = "webdav"
+#         RCLONE_CONFIG_RSHARE_URL    = "${NOMAD_META_RCLONE_CONFIG_RSHARE_URL}"
+#         RCLONE_CONFIG_RSHARE_VENDOR = "${NOMAD_META_RCLONE_CONFIG_RSHARE_VENDOR}"
+#         RCLONE_CONFIG_RSHARE_USER   = "${NOMAD_META_RCLONE_CONFIG_RSHARE_USER}"
+#         RCLONE_CONFIG_RSHARE_PASS   = "${NOMAD_META_RCLONE_CONFIG_RSHARE_PASS}"
+#         REMOTE_PATH                 = "rshare:${NOMAD_META_RCLONE_REMOTE_PATH}"
+#         LOCAL_PATH                  = "/storage"
+#       }
+#       config {
+#         force_pull  = true
+#         image       = "registry.services.ai4os.eu/ai4os/docker-storage:latest"
+#         privileged  = true
+#         mount {
+#           type = "bind"
+#           target = "/srv/.rclone/rclone.conf"
+#           source = "local/rclone.conf"
+#           readonly = false
+#         }
+#         mount {
+#           type = "bind"
+#           target = "/mount_storage.sh"
+#           source = "local/mount_storage.sh"
+#           readonly = false
+#         }
+#         volumes = [
+#           "..${NOMAD_ALLOC_DIR}/data/storage:/storage:rshared",
+#         ]
+#       }
+#       template {
+#         data = <<-EOF
+#         [ai4eosc-share]
+#         type = webdav
+#         url = https://share.services.ai4os.eu/remote.php/dav
+#         vendor = nextcloud
+#         user = ${NOMAD_META_RCLONE_CONFIG_RSHARE_USER}
+#         pass = ${NOMAD_META_RCLONE_CONFIG_RSHARE_PASS}
+#         EOF
+#         destination = "local/rclone.conf"
+#       }
+#       template {
+#         data = <<-EOF
+#         export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $RCLONE_CONFIG_RSHARE_PASS)
+#         dirs='dashboard server'
+#         for dir in $dirs; do
+#             echo "initializing: $LOCAL_PATH/$dir"
+#             rm -rf $LOCAL_PATH/$dir
+#             mkdir -p $LOCAL_PATH/$dir
+#             echo "initializing: $REMOTE_PATH/$dir"
+#             rclone mkdir --log-level DEBUG $REMOTE_PATH/$dir
+#         done
+#         echo "mounting storage: $REMOTE_PATH <+> $LOCAL_PATH"
+#         rclone mount --log-level DEBUG $REMOTE_PATH $LOCAL_PATH \
+#             --allow-non-empty \
+#             --allow-other \
+#             --vfs-cache-mode full
+#         EOF
+#         destination = "local/mount_storage.sh"
+#       }
+#       resources {
+#         cpu    = 50        # minimum number of CPU MHz is 2
+#         memory = 2000
+#       }
+#     }
      
     task "dashboard" {
       # TODO: persistence - adjust wsgi.py of the NVFLARE Dashboad to recover from an existing DB
@@ -249,7 +244,7 @@ job "tool-nvflare-${JOB_UUID}" {
         VARIABLE_NAME="app"
       }
       config {
-        image = "${NOMAD_META_image_dashboard}:${NVFL_VERSION}"
+        image = "registry.services.ai4os.eu/ai4os/ai4os-nvflare-dashboard:${NVFL_VERSION}"
         force_pull = "${NOMAD_META_force_pull_images}"
         ports = ["dashboard"]
         # uncomment for persistence
@@ -259,7 +254,7 @@ job "tool-nvflare-${JOB_UUID}" {
       }
     }
  
-    task "server" {
+    task "main" {
       # TODO: persistence
       lifecycle {
         hook = "poststart"
@@ -279,7 +274,7 @@ job "tool-nvflare-${JOB_UUID}" {
               -X POST \
               -H 'Content-type: application/json' \
               -d '{"email":"'${NVFL_DASHBOARD_USERNAME}'", "password": "'${NVFL_DASHBOARD_PASSWORD}'"}' \
-              https://${JOB_UUID}-dashboard.$${NOMAD_META_domain_name}/api/v1/login \
+              https://${JOB_UUID}-dashboard.$${NOMAD_META_meta_domain}-${BASE_DOMAIN}/api/v1/login \
           )
           if [ ! $(echo -n "$resp" | jq -r '.status') == 'ok' ]; then
             echo "$resp" | jq
@@ -297,7 +292,7 @@ job "tool-nvflare-${JOB_UUID}" {
               -H 'Authorization: Bearer '$access_token \
               -H 'Content-type: application/json' \
               -d '{"pin":"'$PIN'"}' \
-              https://${JOB_UUID}-dashboard.$${NOMAD_META_domain_name}/api/v1/servers/1/blob \
+              https://${JOB_UUID}-dashboard.$${NOMAD_META_meta_domain}-${BASE_DOMAIN}/api/v1/servers/1/blob \
           )
           filename=$(echo -n "$resp" | sed -En 's/^.+?filename\s+\x27([^\x27]+)\x27.*$/\1/p')
           if [ ! -f $filename ]; then
@@ -343,7 +338,7 @@ job "tool-nvflare-${JOB_UUID}" {
         perms = "750"
       }
       config {
-        image = "${NOMAD_META_image_server}:${NVFL_VERSION}"
+        image = "registry.services.ai4os.eu/ai4os/ai4os-nvflare-server:${NVFL_VERSION}"
         force_pull = "${NOMAD_META_force_pull_images}"
         ports = ["server-fl", "server-admin", "server-jupyter"]
         shm_size = ${SHARED_MEMORY}
