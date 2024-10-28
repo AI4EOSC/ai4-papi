@@ -28,13 +28,13 @@ def vault_client(jwt, issuer):
     """
     Common init steps of Vault client
     """
-    # Check we are using EGI Check-In prod
-    if issuer != 'https://aai.egi.eu/auth/realms/egi':
-        raise HTTPException(
-            status_code=400,
-            detail="Secrets are only compatible with EGI Check-In Production OIDC " \
-                   "provider.",
-            )
+    # # Check we are using EGI Check-In prod
+    # if issuer != 'https://aai.egi.eu/auth/realms/egi':
+    #     raise HTTPException(
+    #         status_code=400,
+    #         detail="Secrets are only compatible with EGI Check-In Production OIDC " \
+    #                "provider.",
+    #         )
 
     # Init the Vault client
     client = hvac.Client(
