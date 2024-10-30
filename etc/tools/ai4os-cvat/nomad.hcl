@@ -293,13 +293,13 @@ job "tool-cvat-${JOB_UUID}" {
       template {
         data = <<-EOF
         #!/usr/bin/env bash
-        export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $RCLONE_CONFIG_RSHARE_PASS)
+        export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $$RCLONE_CONFIG_RSHARE_PASS)
         rm -rf $LOCAL_PATH/share
         mkdir -p $LOCAL_PATH/share
         rclone mkdir $REMOTE_PATH/share
         chown 1000:1000 $LOCAL_PATH/share
         chmod 750 $LOCAL_PATH/share
-        rclone --log-level DEBUG mount $REMOTE_PATH/share $LOCAL_PATH/share \
+        rclone --log-level INFO mount $REMOTE_PATH/share $LOCAL_PATH/share \
           --uid 1000 \
           --gid 1000 \
           --dir-perms 0750 \
@@ -329,8 +329,9 @@ job "tool-cvat-${JOB_UUID}" {
         RCLONE_CONFIG_RSHARE_VENDOR = "${NOMAD_META_RCLONE_CONFIG_RSHARE_VENDOR}"
         RCLONE_CONFIG_RSHARE_USER   = "${NOMAD_META_RCLONE_CONFIG_RSHARE_USER}"
         RCLONE_CONFIG_RSHARE_PASS   = "${NOMAD_META_RCLONE_CONFIG_RSHARE_PASS}"
-        REMOTE_PATH                 = "rshare:${NOMAD_META_RCLONE_REMOTE_PATH}"
+        REMOTE_PATH                 = "rshare:${NOMAD_META_RCLONE_REMOTE_PATH}/backups"
         LOCAL_PATH                  = "/alloc/data"
+        RESTORE_FROM                = "${NOMAD_META_restore_from}"
       }
       config {
         force_pull = true
@@ -368,32 +369,34 @@ job "tool-cvat-${JOB_UUID}" {
         data = <<-EOF
         #!/usr/bin/env bash
         tarbals='db data events redis'
-        export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $RCLONE_CONFIG_RSHARE_PASS)
+        export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $$RCLONE_CONFIG_RSHARE_PASS)
         for tarbal in $tarbals; do
-            rm -rf $LOCAL_PATH/$tarbal
-            mkdir -p $LOCAL_PATH/$tarbal
-            if [[ $tarbal == "data" ]]; then
-              chown -R 1000 $LOCAL_PATH/data
-              chgrp -R 1000 $LOCAL_PATH/data
-              chmod -R 750 $LOCAL_PATH/data
-            fi
+          rm -rf $LOCAL_PATH/$tarbal
+          mkdir -p $LOCAL_PATH/$tarbal
+          if [[ $tarbal == "data" ]]; then
+            chown -R 1000 $LOCAL_PATH/data
+            chgrp -R 1000 $LOCAL_PATH/data
+            chmod -R 750 $LOCAL_PATH/data
+          fi
         done
-        if [[ $(rclone lsd $REMOTE_PATH/backup; echo $?) == 0 ]]; then
-          echo "found a CVAT backup, syncing ..."
-          rm -rf $LOCAL_PATH/backup
-          mkdir -p $LOCAL_PATH/backup
-          rclone sync $REMOTE_PATH/backup $LOCAL_PATH/backup --progress
+        if [ -z "$${RESTORE_FROM}" ]; then
+          echo "CVAT backup not specified, a clean start will be performed"
+        elif [[ $(rclone lsd $REMOTE_PATH/$$RESTORE_FROM; echo $?) == 0 ]]; then
+          echo "found a CVAT backup '$$RESTORE_FROM', syncing ..."
+          rm -rf $LOCAL_PATH/$$RESTORE_FROM
+          mkdir -p $LOCAL_PATH/$$RESTORE_FROM
+          rclone sync $REMOTE_PATH/$$RESTORE_FROM $LOCAL_PATH/$$RESTORE_FROM --progress
           for tarbal in $tarbals; do
-            if [ -f $LOCAL_PATH/backup/$tarbal.tar.gz ]; then
+            if [ -f $LOCAL_PATH/$$RESTORE_FROM/$tarbal.tar.gz ]; then
               echo -n "extracting $tarbal.tar.gz ... "
-              cd $LOCAL_PATH/$tarbal && tar -xf $LOCAL_PATH/backup/$tarbal.tar.gz --strip 1
-              if [[ $? == 0 ]]; then echo "OK"; else "ERROR"; fi
+              cd $LOCAL_PATH/$tarbal && tar -xf $LOCAL_PATH/$$RESTORE_FROM/$tarbal.tar.gz --strip 1
+              if [[ $? == 0 ]]; then echo "OK"; else echo "ERROR"; fi
             else
-              echo "file not found: $LOCAL_PATH/backup/$tarbal.tar.gz"
+              echo "file not found: $LOCAL_PATH/$$RESTORE_FROM/$tarbal.tar.gz"
             fi
           done
         else
-          echo "CVAT backup not found"
+          echo "CVAT backup '$$RESTORE_FROM' not found, a clean start will be performed"
         fi
         EOF
         destination = "local/sync_local.sh"
@@ -418,8 +421,9 @@ job "tool-cvat-${JOB_UUID}" {
         RCLONE_CONFIG_RSHARE_VENDOR = "${NOMAD_META_RCLONE_CONFIG_RSHARE_VENDOR}"
         RCLONE_CONFIG_RSHARE_USER   = "${NOMAD_META_RCLONE_CONFIG_RSHARE_USER}"
         RCLONE_CONFIG_RSHARE_PASS   = "${NOMAD_META_RCLONE_CONFIG_RSHARE_PASS}"
-        REMOTE_PATH                 = "rshare:${NOMAD_META_RCLONE_REMOTE_PATH}"
+        REMOTE_PATH                 = "rshare:${NOMAD_META_RCLONE_REMOTE_PATH}/backups"
         LOCAL_PATH                  = "/alloc/data"
+        BACKUP_NAME                 = "${NOMAD_META_backup_name}"
       }
       config {
         force_pull = true
@@ -456,19 +460,29 @@ job "tool-cvat-${JOB_UUID}" {
       template {
         data = <<-EOF
         #!/usr/bin/env bash
+        TS=$(date +"%Y-%m-%d-%H-%M-%S-%N")
+        BACKUP_NAME="$${BACKUP_NAME}_$${TS}"
         tarbals='db data events redis'
-        export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $RCLONE_CONFIG_RSHARE_PASS)
-        echo "creating a CVAT backup ..."
-        rm -rf $LOCAL_PATH/backup
-        mkdir -p $LOCAL_PATH/backup
+        export RCLONE_CONFIG_RSHARE_PASS=$(rclone obscure $$RCLONE_CONFIG_RSHARE_PASS)
+        echo "creating a CVAT backup $$BACKUP_NAME ..."
+        if [[ -d $LOCAL_PATH/$$BACKUP_NAME ]]; then
+          echo "ERROR: local backup folder $LOCAL_PATH/$$BACKUP_NAME already exists"
+          exit 1
+        fi
+        rm -rf $LOCAL_PATH/$$BACKUP_NAME
+        mkdir -p $LOCAL_PATH/$$BACKUP_NAME
         cd $LOCAL_PATH
         for tarbal in $tarbals; do
           echo -n "creating $tarbal.tar.gz ..."
-          tar -czf $LOCAL_PATH/backup/$tarbal.tar.gz $tarbal
-          if [ -f $LOCAL_PATH/backup/$tarbal.tar.gz ]; then echo "OK"; else echo "ERROR"; fi
+          tar -czf $LOCAL_PATH/$$BACKUP_NAME/$tarbal.tar.gz $tarbal
+          if [ -f $LOCAL_PATH/$$BACKUP_NAME/$tarbal.tar.gz ]; then echo "OK"; else echo "ERROR"; fi
         done
-        rclone mkdir $REMOTE_PATH/backup
-        rclone sync $LOCAL_PATH/backup $REMOTE_PATH/backup --progress
+        if [[ $(rclone lsd $REMOTE_PATH/$$BACKUP_NAME; echo $?) == 0 ]]; then
+          echo "ERROR: remote backup folder $REMOTE_PATH/$$BACKUP_NAME already exists"
+          exit 1
+        fi
+        rclone mkdir $REMOTE_PATH/$$BACKUP_NAME
+        rclone sync $LOCAL_PATH/$$BACKUP_NAME $REMOTE_PATH/$$BACKUP_NAME --progress
         EOF
         destination = "local/sync_remote.sh"
       }
@@ -510,23 +524,23 @@ job "tool-cvat-${JOB_UUID}" {
           echo "
           CREATE TABLE IF NOT EXISTS $$$${CLICKHOUSE_DB}.events
           (
-              \`scope\` String NOT NULL,
-              \`obj_name\` String NULL,
-              \`obj_id\` UInt64 NULL,
-              \`obj_val\` String NULL,
-              \`source\` String NOT NULL,
-              \`timestamp\` DateTime64(3, 'Etc/UTC') NOT NULL,
-              \`count\` UInt16 NULL,
-              \`duration\` UInt32 DEFAULT toUInt32(0),
-              \`project_id\` UInt64 NULL,
-              \`task_id\` UInt64 NULL,
-              \`job_id\` UInt64 NULL,
-              \`user_id\` UInt64 NULL,
-              \`user_name\` String NULL,
-              \`user_email\` String NULL,
-              \`org_id\` UInt64 NULL,
-              \`org_slug\` String NULL,
-              \`payload\` String NULL
+            \`scope\` String NOT NULL,
+            \`obj_name\` String NULL,
+            \`obj_id\` UInt64 NULL,
+            \`obj_val\` String NULL,
+            \`source\` String NOT NULL,
+            \`timestamp\` DateTime64(3, 'Etc/UTC') NOT NULL,
+            \`count\` UInt16 NULL,
+            \`duration\` UInt32 DEFAULT toUInt32(0),
+            \`project_id\` UInt64 NULL,
+            \`task_id\` UInt64 NULL,
+            \`job_id\` UInt64 NULL,
+            \`user_id\` UInt64 NULL,
+            \`user_name\` String NULL,
+            \`user_email\` String NULL,
+            \`org_id\` UInt64 NULL,
+            \`org_slug\` String NULL,
+            \`payload\` String NULL
           )
           ENGINE = MergeTree
           PARTITION BY toYYYYMM(timestamp)
@@ -1012,7 +1026,7 @@ job "tool-cvat-${JOB_UUID}" {
         command = "run"
         args = [
           "--server",
-          "--log-level=debug",
+          "--log-level=info",
           "--set=services.cvat.url=http://${NOMAD_HOST_ADDR_server}",
           "--set=bundles.cvat.service=cvat",
           "--set=bundles.cvat.resource=/api/auth/rules",
