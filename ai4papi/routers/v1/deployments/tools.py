@@ -45,11 +45,10 @@ def get_deployments(
     auth_info = auth.get_user_info(token=authorization.credentials)
 
     # If no VOs, then retrieve jobs from all user VOs
-    # Else only retrieve from allowed VOs
+    # Always remove VOs that do not belong to the project
     if not vos:
         vos = auth_info['vos']
-    else:
-        vos = set(vos).intersection(auth_info['vos'])
+    vos = set(vos).intersection(set(papiconf.MAIN_CONF['auth']['VO']))
     if not vos:
         raise HTTPException(
             status_code=401,
@@ -229,23 +228,7 @@ def create_deployment(
     else:
         priority = 50
 
-    # Remove non-compliant characters from hostname
     base_domain = papiconf.MAIN_CONF['lb']['domain'][vo]
-    hostname = utils.safe_hostname(
-        hostname=user_conf['general']['hostname'],
-        job_uuid=job_uuid,
-    )
-
-    #TODO: reenable custom hostname, when we are able to parse all node metadata
-    # (domain key) to build the true domain
-    hostname = job_uuid
-
-    # # Check the hostname is available in all data-centers
-    # # (we don't know beforehand where the job will land)
-    # #TODO: make sure this does not break if the datacenter is unavailable
-    # #TODO: disallow custom hostname, pain in the ass, slower deploys
-    # for datacenter in papiconf.MAIN_CONF['nomad']['datacenters']:
-    #     utils.check_domain(f"{hostname}.{datacenter}-{base_domain}")
 
     # Deploy a Federated server
     if tool_name == 'ai4os-federated-server':
@@ -279,7 +262,7 @@ def create_deployment(
                 'TITLE': user_conf['general']['title'][:45],  # keep only 45 first characters
                 'DESCRIPTION': user_conf['general']['desc'][:1000],  # limit to 1K characters
                 'BASE_DOMAIN': base_domain,
-                'HOSTNAME': hostname,
+                'HOSTNAME': job_uuid,
                 'DOCKER_IMAGE': user_conf['general']['docker_image'],
                 'DOCKER_TAG': user_conf['general']['docker_tag'],
                 'CPU_NUM': user_conf['hardware']['cpu_num'],
@@ -295,8 +278,12 @@ def create_deployment(
                 'FEDERATED_MIN_AVAILABLE_CLIENTS': user_conf['configuration']['min_available_clients'],
                 'FEDERATED_STRATEGY': user_conf['configuration']['strategy'],
                 'MU_FEDPROX': user_conf['configuration']['mu'],
-                'FEDAVGM_SERVER_FL' : user_conf['configuration']['momentum'],
-                'FEDAVGM_SERVER_MOMENTUM': user_conf['configuration']['fl']
+                'FEDAVGM_SERVER_FL' : user_conf['configuration']['fl'],
+                'FEDAVGM_SERVER_MOMENTUM': user_conf['configuration']['momentum'],
+                'DP': user_conf['configuration']['dp'],
+                'NOISE_MULT': user_conf['configuration']['noise_mult'],
+                'SAMPLED_CLIENTS': user_conf['configuration']['sampled_clients'],
+                'CLIP_NORM': user_conf['configuration']['clip_norm']
             }
         )
 
@@ -316,7 +303,7 @@ def create_deployment(
     elif tool_name == 'ai4os-cvat':
 
         # Enforce defining CVAT username and password
-        cvat = {k: v for k, v in user_conf['general'].items() if k.startswith('cvat')}
+        cvat = {k: v for k, v in user_conf['general'].items() if k in ['cvat_username', 'cvat_password']}
         if not all(cvat.values()):
             raise HTTPException(
                 status_code=400,
@@ -332,7 +319,6 @@ def create_deployment(
                 )
 
         # Replace the Nomad job template
-        current_date = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         job_title = re.sub(
             r'[<>:"/\\|?* ]',
             '_',
@@ -350,11 +336,11 @@ def create_deployment(
                 'TITLE': user_conf['general']['title'][:45],  # keep only 45 first characters
                 'DESCRIPTION': user_conf['general']['desc'][:1000],  # limit to 1K characters
                 'BASE_DOMAIN': base_domain,
-                'HOSTNAME': hostname,
+                'HOSTNAME': job_uuid,
                 'CVAT_USERNAME': user_conf['general']['cvat_username'],
                 'CVAT_PASSWORD': user_conf['general']['cvat_password'],
-                'RESTORE_FROM': user_conf['general']['cvat_backup'],
-                'BACKUP_NAME': f'{current_date}_{job_title}',
+                'RESTORE_FROM': user_conf['storage']['cvat_backup'],
+                'BACKUP_NAME': f'{job_title}',
                 'RCLONE_CONFIG_RSHARE_URL': user_conf['storage']['rclone_url'],
                 'RCLONE_CONFIG_RSHARE_VENDOR': user_conf['storage']['rclone_vendor'],
                 'RCLONE_CONFIG_RSHARE_USER': user_conf['storage']['rclone_user'],
