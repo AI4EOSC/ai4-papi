@@ -265,6 +265,7 @@ job "tool-nvflare-${JOB_UUID}" {
         data = <<-EOF
         #!/bin/bash
         PIN='123456'
+        sleep_time=10
         retries=10
         fl_server_dir=''
         while [[ $retries > 0 ]]; do
@@ -272,16 +273,20 @@ job "tool-nvflare-${JOB_UUID}" {
           resp=$( \
             curl \
               -X POST \
+              -L \
               -H 'Content-type: application/json' \
               -d '{"email":"'${NVFL_DASHBOARD_USERNAME}'", "password": "'${NVFL_DASHBOARD_PASSWORD}'"}' \
               https://${JOB_UUID}-dashboard.$${NOMAD_META_meta_domain}-${BASE_DOMAIN}/api/v1/login \
           )
-          if [ ! $(echo -n "$resp" | jq -r '.status') == 'ok' ]; then
-            echo "$resp" | jq
+          status=$(jq -r ".status" <<<"$resp")
+          if [ "$status" != "ok" ]; then
+            echo -e "resp: $resp"
             retries=$((retries-1))
+            echo "retrying in ${sleep_time}s ..."
+            sleep ${sleep_time}
             continue
           fi
-          access_token=$(echo -n "$resp" | jq -r '.access_token')
+          access_token=$(jq -r ".access_token" <<<"$resp")
           # 2) download server startup kit (primary)
           resp=$(\
             curl \
@@ -298,6 +303,8 @@ job "tool-nvflare-${JOB_UUID}" {
           if [ ! -f $filename ]; then
             echo "file not found: $filename"
             retries=$((retries-1))
+            echo "retrying in ${sleep_time}s ..."
+            sleep ${sleep_time}
             continue
           fi
           # 3) unzip server startup kit
@@ -306,6 +313,8 @@ job "tool-nvflare-${JOB_UUID}" {
           fl_server_dir=$(echo -n "$filename" | sed -En 's/^(.+)\.zip$/\1/p')
           if [ ! -d $fl_server_dir ]; then
             echo "directory not found: $fl_servet_dir"
+            echo "retrying in ${sleep_time}s ..."
+            sleep ${sleep_time}
             continue
           fi
           retries=0
