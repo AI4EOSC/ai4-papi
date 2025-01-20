@@ -211,6 +211,11 @@ def create_deployment(
             reference=user_conf,
         )
 
+    # NVIDIA Flare
+    # use the value of nvfl_dashboard_project_app_location for the docker_image parameter
+    if tool_name == "ai4os-nvflare" and "docker_image" not in user_conf["general"]:
+        user_conf["general"]["docker_image"] = user_conf["general"]["nvfl_dashboard_project_app_location"]
+
     # Utils validate conf
     user_conf = utils.validate_conf(user_conf)
 
