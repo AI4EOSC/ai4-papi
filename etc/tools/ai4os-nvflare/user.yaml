@@ -60,7 +60,7 @@ general:
 
   nvfl_dashboard_project_app_location:
     name: NVFlare project docker image download link
-    value: ''
+    value: 'registry.services.ai4os.eu/ai4oshub/ai4os-nvflare-client:2.5-Stifo'
     description: NVFlare project docker image download link
 
   nvfl_dashboard_project_starting_date:
