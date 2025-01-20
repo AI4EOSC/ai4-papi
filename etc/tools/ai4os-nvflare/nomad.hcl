@@ -15,7 +15,7 @@ job "tool-nvflare-${JOB_UUID}" {
   region    = "global"
   id        = "${JOB_UUID}"
   priority  = "${PRIORITY}"
-   
+
   meta {
     owner                             = "${OWNER}"  # user-id from OIDC
     owner_name                        = "${OWNER_NAME}"
@@ -83,9 +83,9 @@ job "tool-nvflare-${JOB_UUID}" {
     attempts  = 0
     unlimited = false
   }
- 
+
   group "usergroup" {
- 
+
     network {
       port "dashboard" {
         to = 80
@@ -100,7 +100,7 @@ job "tool-nvflare-${JOB_UUID}" {
         to = 8888
       }
     }
-     
+
     service {
       name = "${JOB_UUID}-dashboard"
       port = "dashboard"
@@ -123,7 +123,7 @@ job "tool-nvflare-${JOB_UUID}" {
         "traefik.tcp.routers.${JOB_UUID}-server-fl.rule=HostSNI(`${JOB_UUID}-server.${meta.domain}-${BASE_DOMAIN}`)",
       ]
     }
- 
+
     service {
       name = "${JOB_UUID}-server-admin"
       port = "server-admin"
@@ -135,7 +135,7 @@ job "tool-nvflare-${JOB_UUID}" {
         "traefik.tcp.routers.${JOB_UUID}-server-admin.rule=HostSNI(`${JOB_UUID}-server.${meta.domain}-${BASE_DOMAIN}`)",
       ]
     }
- 
+
     service {
       name = "${JOB_UUID}-server-jupyter"
       port = "server-jupyter"
@@ -223,7 +223,7 @@ job "tool-nvflare-${JOB_UUID}" {
 #         memory = 2000
 #       }
 #     }
-     
+
     task "dashboard" {
       # TODO: persistence - adjust wsgi.py of the NVFLARE Dashboad to recover from an existing DB
       driver = "docker"
@@ -253,7 +253,7 @@ job "tool-nvflare-${JOB_UUID}" {
         #]
       }
     }
- 
+
     task "main" {
       # TODO: persistence
       lifecycle {
@@ -383,7 +383,7 @@ job "tool-nvflare-${JOB_UUID}" {
         memory_max = ${RAM}
       }
     }
-     
+
   }
 }
 

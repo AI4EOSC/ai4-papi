@@ -44,7 +44,6 @@ JENKINS_TOKEN = os.getenv("PAPI_JENKINS_TOKEN")
 
 
 class Catalog:
-    
     def __init__(self, repo: str, branch: str = "master", item_type: str = "item") -> None:
         """
         Parameters:
@@ -55,7 +54,7 @@ class Catalog:
         self.repo = repo
         self.branch = branch
         self.item_type = item_type
-    
+
     @cached(cache=TTLCache(maxsize=1024, ttl=6 * 60 * 60))
     def get_items(
         self,
@@ -80,8 +79,7 @@ class Catalog:
 
         cfg = configparser.ConfigParser()
         cfg.read_string(r.text)
-    
-    
+
         modules = {}
         for section in cfg.sections():
             items = dict(cfg.items(section))
@@ -96,6 +94,7 @@ class Catalog:
                 _ = modules.pop(tool_name)
 
         return modules
+
     @cached(cache=TTLCache(maxsize=1024, ttl=6 * 60 * 60))
     def get_filtered_list(
         self,
@@ -115,7 +114,7 @@ class Catalog:
         # (!): without list(...) FastAPI throws weird error
         # ValueError: [ValueError('dictionary update sequence element #0 has length 1; 2 is required'), TypeError('vars() argument must have __dict__ attribute')]
         return modules
-    
+
     @cached(cache=TTLCache(maxsize=1024, ttl=6 * 60 * 60))
     def get_summary(
         self,
@@ -144,8 +143,7 @@ class Catalog:
             meta["name"] = m
             summary.append(meta)
         return summary
-    
-    
+
     def get_tags(
         self,
     ):
@@ -155,8 +153,7 @@ class Catalog:
         Returns an empty list.
         """
         return []
-    
-    
+
     def get_metadata(
         self,
         item_name: str,
@@ -186,7 +183,7 @@ class Catalog:
         This 1 week expiration is just a backup in case Jenkins does not work.
         """
         print(f"Retrieving metadata from {item_name}")
-        
+
         # Check if item is in the items list
         items = self.get_items()
         if item_name not in items.keys():
@@ -194,14 +191,14 @@ class Catalog:
                 status_code=404,
                 detail=f"Item {item_name} not in catalog: {list(items.keys())}",
             )
-        
+
         # Retrieve metadata from default branch
         # Use try/except to avoid that a single module formatting error could take down
         # all the Dashboard
         branch = items[item_name].get("branch", "master")
         url = items[item_name]["url"].replace("github.com", "raw.githubusercontent.com")
         metadata_url = f"{url}/{branch}/ai4-metadata.yml"
-        
+
         error = None
         # Try to retrieve the metadata from Github
         r = requests.get(metadata_url)
@@ -220,7 +217,7 @@ class Catalog:
                     "The metadata of this module could not be retrieved because the "
                     "metadata file is badly formatted (`ai4-metadata.yml`)."
                 )
-            
+
             # Since we are loading the metadata directly from the repo main branch,
             # we cannot know if they have successfully passed or not the Jenkins
             # validation. So we have to validate them, just in case we have naughty users.
@@ -234,7 +231,7 @@ class Catalog:
                         "specifications of the AI4EOSC Platform (see the "
                         "[metadata validator](https://github.com/ai4os/ai4-metadata))."
                     )
-                
+
                 # Make sure the repo belongs to one of supported orgs
                 pattern = r"https?:\/\/(www\.)?github\.com\/([^\/]+)\/"
                 match = re.search(pattern, metadata["links"]["source_code"])
@@ -251,7 +248,7 @@ class Catalog:
                         "the project. If you are the developer of this module, please "
                         'check the "source_code" link in your metadata.'
                     )
-        
+
         # If any of the previous steps raised an error, load a metadata placeholder
         if error:
             print(f"  [Error] {error}")
@@ -282,7 +279,7 @@ class Catalog:
                 "libraries": [],
                 "data-type": [],
             }
-        
+
         else:
             # Replace some fields with the info gathered from Github
             pattern = r"github\.com/([^/]+)/([^/]+?)(?:\.git|/)?$"
@@ -292,13 +289,13 @@ class Catalog:
                 if force:
                     utils.get_github_info.cache.pop((owner, repo), None)
                 gh_info = utils.get_github_info(owner, repo)
-                
+
                 metadata.setdefault("dates", {})
                 metadata["dates"]["created"] = gh_info.get("created", "")
                 metadata["dates"]["updated"] = gh_info.get("updated", "")
                 metadata["license"] = gh_info.get("license", "")
                 metadata["links"]["source_code"] = f"https://github.com/{owner}/{repo}"
-            
+
             # Add Jenkins CI/CD links
             metadata["links"]["cicd_url"] = (
                 f"https://jenkins.services.ai4os.eu/job/{github_org}/job/{item_name}/job/{branch}/"
@@ -306,7 +303,7 @@ class Catalog:
             metadata["links"]["cicd_badge"] = (
                 f"https://jenkins.services.ai4os.eu/buildStatus/icon?job={github_org}/{item_name}/{branch}"
             )
-            
+
             # Add DockerHub
             # TODO: when the migration is finished, we have to generate the url from the module name
             # (ie. ignore the value coming from the metadata)
@@ -316,9 +313,9 @@ class Catalog:
 
             # Add the item name
             metadata["id"] = item_name
-        
+
         return metadata
-    
+
     def refresh_metadata_cache_entry(
         self,
         item_name: str,
